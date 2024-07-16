@@ -1,0 +1,517 @@
+---
+title: "Saglik Sigortasi Analizi"
+author: "Fatma Zehra Cinar"
+date: ''
+output:
+  html_document:
+    self_contained: yes
+    number_sections: no
+    theme: flatly
+    highlight: haddock
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+---
+```{css, echo=FALSE}
+body{
+  background-color: #FAFAFA;
+    font-size: 18px;
+  line-height: 1.8;
+}
+code.r{
+  font-size: 16px;
+}
+```
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setlocale("LC_ALL", locale="Turkish")
+```
+
+# Soru 1
+
+## (a)
+```{r}
+library(tidyverse)
+
+load("sagliksig.rda")
+
+# Veri setini eğitim ve test setlerine bölme
+set.seed(123)
+n <- nrow(train_sig)
+ntrain <- round(n * 0.75)
+train_indices <- sample(n, ntrain)
+
+# Eğitim ve test setlerini oluşturma ve inceleme
+train_data <- train_sig[train_indices, ]
+test_data <- train_sig[-train_indices, ]
+
+str(train_data)
+str(test_data)
+
+# Regresyon modelini oluşturma
+model <- lm(lmaliyet ~ yas + cinsiyet + BMI + cocuksay + sigara + bolge + yas:sigara, data = train_data)
+
+summary(model)
+
+```
+# Yorum 
+
+ Medyanın 0'a yakın olması, modelin ortalama olarak iyi bir performans sergilediğini gösterir.
+ 
+Modelin bağımsız değişkenlerinden yas, BMI, cocuksay, sigarahayır, bolgekuzeydoğu ve yas:sigarahayır istatistiksel olarak anlamlıdır.
+
+cinsiyetK, bolgegüneydoğu ve bolgekuzeybatı değişkenleri istatistiksel olarak anlamlı değildir.
+Modelin R-kare ve düzeltilmiş R-kare değerleri yüksek olup, modelin bağımsız değişkenlerinin hedef değişkeni iyi açıkladığını gösterir.
+
+F-statistik ve p-değeri, modelin genel olarak anlamlı olduğunu ve bağımsız değişkenlerin hedef değişken üzerinde önemli etkileri olduğunu gösterir.
+
+Bu sonuçlar, modelin lmaliyet değişkenini tahmin etmede başarılı olduğunu ve bağımsız değişkenlerin çoğunun hedef değişken üzerinde anlamlı etkiler yarattığını göstermektedir.
+
+
+## (b) 
+
+Test verisini kullanarak ortalama hata karesini (test MSE) hesaplayınız. Test verisindeki gerçek hedef değişken ile kestirim değerlerinin serpilme grafiğini 45-derece doğrusu ile birlikte çiziniz ve R-kare ile birlikte yorumlayınız. 
+
+```{r}
+#Tahmin yapma
+test_predictions <- predict(model, newdata = test_data)
+
+results <- data.frame(real = test_data$lmaliyet, predicted = test_predictions)
+
+# MSE hesaplama
+test_mse <- mean((results$real - results$predicted)^2)
+print(paste("Test MSE:", test_mse))
+
+# Serpilme grafiği çizme
+library(ggplot2)
+ggplot(results, aes(x = real, y = predicted)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  labs(title = "Gerçek ve Tahmin Edilen Değerlerin Serpilme Grafiği",
+       x = "Gerçek Değerler",
+       y = "Tahmin Edilen Değerler") +
+  theme_minimal()
+
+# R-kare değerini hesaplama
+r_squared <- cor(results$real, results$predicted)^2
+print(paste("Test Seti R-kare:", r_squared))
+
+
+```
+
+
+# Yorum
+
+0.1575'lik bir MSE değeri düşük olduğundan modelin test verisinde makul bir doğrulukla tahmin yaptığını gösterir.
+
+Noktaların çoğunluğunun 45-derece doğrusu etrafında yoğunlaşması modelin tahminlerinin gerçek değerlere yakın olduğunu ve dolayısıyla modelin doğruluğunun yüksek olduğunu gösterir.
+
+Model hedef değişkenin %82.8'ini açıklıyor Bu oldukça yüksek bir açıklama gücüdür.
+
+--------------------------------------------------------
+
+# Soru 2
+
+## (a)
+
+Önceki sorudaki verileri kullanarak bir regresyon ağacı eğitiniz. Ağacın grafiğini çizerek yorumlayınız. Test verisinde MSE’yi hesaplayınız. Önceki sorudaki regresyon modeline göre daha başarılı mı?
+
+
+```{r}
+
+library(tree)
+
+# Regresyon ağacı modeli oluşturma
+tree_model <- tree(lmaliyet ~ yas + cinsiyet + BMI + cocuksay + sigara + bolge, data = train_data)
+
+# Modelin özetini görüntüleme
+summary(tree_model)
+
+# Ağacın grafiğini çizme
+plot(tree_model)
+text(tree_model, pretty = 0)
+
+```
+# Yorum
+Sigara içenlerle içmeyenler arasında büyük bir ayrım olduğunu, içmeyenlere göre yaş sınırı 3 yaş daha küçükten 30 olarak başlamış. Sonrasında BMI değerlerinin önemli olduğunu görüyoruz.
+
+ 0.1445 hata oranını küçük olduğundan modelin tahminlerinin gerçek değerlere yakın olduğunu söyleyebiliriz.
+ 
+```{r}
+# Tahmin yapma
+tree_predictions <- predict(tree_model, newdata = test_data)
+
+# MSE hesaplama
+tree_mse <- mean((test_data$lmaliyet - tree_predictions)^2)
+print(paste("Regresyon Ağacı Test MSE:", tree_mse))
+
+```
+# Yorum
+Bu modelin de MSE oranı düşük olduğundan başarılı diyebiliriz ama karşılaştırdığımızda ilk modelin daha başarılı olduğunu görüyoruz.
+
+
+## (b)
+
+Uygun ayarlanma parametrelerini seçerek Bagging ve Random Forest algoritmalarını eğitiniz. Her bir algoritmanın test MSE değerlerini hesaplayınız. Öncek sonuçlarla birlikte tartışınız. Bu yöntemlere göre önemli değişkenler hangileridir? 
+
+
+```{r}
+library(randomForest)
+
+
+# Bagging modeli oluşturma
+set.seed(123)
+bagging_model <- randomForest(lmaliyet ~ yas + cinsiyet + BMI + cocuksay + sigara + bolge, data = train_data, mtry = ncol(train_data) - 1, importance = TRUE)
+
+# Tahmin yapma
+bagging_predictions <- predict(bagging_model, newdata = test_data)
+
+# Bagging modeli için MSE hesaplama
+bagging_mse <- mean((test_data$lmaliyet - bagging_predictions)^2)
+print(paste("Bagging Modeli Test MSE:", bagging_mse))
+
+
+# Random Forest modeli oluşturma
+set.seed(123)
+rf_model <- randomForest(lmaliyet ~ yas + cinsiyet + BMI + cocuksay + sigara + bolge, data = train_data, importance = TRUE)
+
+# Tahmin yapma
+rf_predictions <- predict(rf_model, newdata = test_data)
+
+# Random Forest modeli için MSE hesaplama
+rf_mse <- mean((test_data$lmaliyet - rf_predictions)^2)
+print(paste("Random Forest Modeli Test MSE:", rf_mse))
+
+
+# Değişken önemini belirleme
+importance(bagging_model)
+importance(rf_model)
+
+# Değişken önemini grafiksel olarak gösterme
+varImpPlot(bagging_model)
+varImpPlot(rf_model)
+
+```
+
+# Yorum
+Random Forest modeli, en düşük Test MSE değerine sahip olduğu için en iyi performansı gösteren modeldir. 
+
+Sigara kullanımı, yaş, BMI ve çocuk sayısı en önemli değişkenlerdir. Sigara kullanımı en yüksek etkiye sahip değişkendir.
+
+--------------------------------------------------------
+
+# Soru 3
+
+## (a)
+
+Önceki sorulardaki sigorta veri kümesini kullanarak lmaliyet için Boosting algoritmasını eğitmek istiyoruz. Uygun ayarlanma parametrelerini kullanarak GBM paketi ile modeli eğitiniz. Test MSE değerini hesaplayınız ve önceki sonuçlarla karşılaştırınız. 
+
+
+```{r}
+
+library(gbm)
+
+# Boosting modeli oluşturma
+set.seed(1)
+boost_model <- gbm(lmaliyet ~ yas + cinsiyet + BMI + cocuksay + sigara + bolge, 
+                   data = train_data, 
+                   distribution = "gaussian", 
+                   n.trees = 1000,
+                   interaction.depth = 1,
+                   shrinkage = 0.2)
+
+# Tahmin yapma
+boost_predictions <- predict(boost_model, newdata = test_data, n.trees = 1000)
+
+# MSE hesaplama
+boost_mse <- mean((test_data$lmaliyet - boost_predictions)^2)
+print(paste("Boosting Modeli Test MSE:", boost_mse))
+
+```
+# Yorum
+Diğer modellere göre hata oranı yüksek olduğundan başarısızdır.
+
+
+## (b)
+
+GBM boosting algoritmasında seçmemiz gereken 3 ayarlanma parametresi vardır. Bu hiperparametreler için aşağıdaki gibi bir grid oluşturalım. 
+```{r}
+# Hiperparametre gridini oluşturma
+B <- c(500, 1000, 2000, 5000) # n.trees
+d <- c(1, 2, 3, 4)            # interaction.depth
+lambda <- c(0.001, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2) # shrinkage
+G <- expand.grid(B = B, d = d, lambda = lambda)
+
+```
+
+Eğitim verilerini kullanarak 5-katlı çapraz geçerleme yöntemi ile optimal ayarlanma parametrelerini seçiniz. Bu değerleri kullanarak test MSE'yi hesaplayınız. 
+
+
+
+```{r}
+# Eğitim ve test MSE değerlerini saklamak için
+nG <- nrow(G)
+boost_train_MSE <- rep(NA, nG)
+boost_test_MSE <- rep(NA, nG)
+cv_errors <- rep(NA, nG)
+
+# Boosting modeli eğitme ve çapraz doğrulama ile MSE hesaplama
+set.seed(1)
+for (i in 1:nG) {
+  params <- G[i, ]
+  model <- gbm(lmaliyet ~ yas + cinsiyet + BMI + cocuksay + sigara + bolge, 
+               data = train_data, 
+               distribution = "gaussian", 
+               n.trees = params$B, 
+               interaction.depth = params$d, 
+               shrinkage = params$lambda, 
+               cv.folds = 5)
+  
+  # Çapraz doğrulama hatası
+  cv_errors[i] <- min(model$cv.error)
+  
+  # Test seti MSE
+  boost_pred_test <- predict(model, newdata = test_data, n.trees = params$B) 
+  boost_test_MSE[i] <- mean((test_data$lmaliyet - boost_pred_test)^2)
+  
+  # Eğitim seti MSE
+  boost_pred_train <- predict(model, newdata = train_data, n.trees = params$B) 
+  boost_train_MSE[i] <- mean((train_data$lmaliyet - boost_pred_train)^2) 
+}
+
+# En iyi parametreleri bulma
+best_params <- G[which.min(cv_errors), ]
+best_test_MSE <- min(boost_test_MSE)
+print(paste("En iyi parametreler: n.trees =", best_params$B, 
+            "interaction.depth =", best_params$d, 
+            "shrinkage =", best_params$lambda))
+print(paste("Boosting Modeli En İyi Test MSE:", best_test_MSE))
+
+
+```
+
+--------------------------------------------------------
+
+# Soru 4
+
+Bu soruda döviz kurunun yönünü (yukarı/aşağı) sınıflandırmaya çalışacağız. 
+USD/TL döviz kurundaki günlük değişimin yönünü (up/down) son 5 günlük döviz kuru ve hisse senedi piyasası değişimlerinden hareketle öngörmek istiyoruz. 
+
+`finmarkets.RData` 13/01/2000 - 04/05/2020 dönemini kapsayan 5086 günlük gözlemden oluşmaktadır. 
+
+```{r}
+library(tidyverse)
+load("finmarkets.RData")
+str(finmarkets) 
+```
+`usdret`: USD/TL döviz kurundaki günlük değişim, %. 
+
+`usddirection`: iki seviyeli faktör değişkeni, usdret'in işaret negatifse "Down", pozitifse "Up". 
+
+`usdretlag1-usdretlag5`: usdret'in 5 günlük gecikmeli değerleri, birinci gecikme, ikinci gecikme, vs. 
+
+`bistretlag1-bistretlag5`: BIST100 getirilerinin gecikmeli değerleri. 
+
+Bugünkü döviz kurunun yönünü öngörmek isteyen bir yatırımcının son beş günlük döviz kuru ve BIST100 hareketlerini bildiğini varsayıyoruz. 
+
+Verileri aşağıdaki gibi eğitim ve test kümelerine ayıralım: 
+```{r}
+fin_train <- finmarkets |> filter(year<=2016)
+fin_test <- finmarkets |> filter(year>2016)
+```
+
+
+
+## (a)
+
+Eğitim kümesini kullanarak hedef değişken `usddirection` için bir lojistik regresyon sınıflandırma modeli eğitiniz. Modelde sadece `usdretlag1` - `usdretlag5` gecikme değişkenlerini (5 değişken) kullanın. Test verilerini kullanarak doğruluk ve hata oranlarını hesaplayınız. Karışıklık matrisini (Confusion matrix) hesaplayınız ve yorumlayınız. No information rate kaçtır? Model sizce başarılı mı? 
+
+
+```{r}
+library(caret)
+# Lojistik regresyon modeli oluşturma
+logistic_model <- glm(usddirection ~ usdretlag1 + usdretlag2 + usdretlag3 + usdretlag4 + usdretlag5, 
+                      data = fin_train, 
+                      family = binomial)
+
+summary(logistic_model)
+
+# Tahmin
+test_pred_prob <- predict(logistic_model, newdata = fin_test, type = "response")
+test_pred <- ifelse(test_pred_prob > 0.5, "Up", "Down")
+
+# Doğruluk ve hata oranlarını hesaplama
+confusion_matrix <- confusionMatrix(factor(test_pred, levels = c("Down", "Up")), fin_test$usddirection)
+accuracy <- confusion_matrix$overall['Accuracy']
+error_rate <- 1 - accuracy
+print(paste("Doğruluk:", accuracy))
+print(paste("Hata Oranı:", error_rate))
+
+print(confusion_matrix)
+
+# No Information Rate hesaplama
+nir <- max(table(fin_test$usddirection)) / nrow(fin_test)
+print(paste("No Information Rate (NIR):", nir))
+
+```
+# Yorum
+Doğruluk oranı %53.54 ve hata oranı %46.46'dır. Bu, modelin test verilerindeki gözlemlerin %53.54'ünü doğru tahmin ettiğini gösterir.
+Veri setinde "FP" sınıfının oranını %52.82 olduğunu görüyoruz. Yani, hiçbir model kullanmadan en yaygın sınıfı tahmin etsek bile %52.82 doğruluk oranına ulaşırdık.
+Modelin doğruluk oranı (%53.54), No Information Rate'den (%52.82) anlamlı derecede farklı değildir. Bu, modelin performansının rastgele tahminden çok da iyi olmadığını gösterir. Dolayısıyla, model başarısız olarak değerlendirilebilir. 
+
+## (b)
+
+Lojistik regresyon modelini `usdretlag1` - `usdretlag5` gecikmelerinin yanı sıra BIST100 gecikmelerini, `bistretlag1`-`bistretlag5`, ekleyerek genişletiniz (toplamda 10 değişkenli bir model) ve eğitiniz. Modelin performansını test verilerinden hareketle değerlendiriniz ve öncek kısımdaki sonuçlarla karşılaştırınız. Test performansına göre hangi model daha başarılıdır? Seçtiğiniz modeli yatırım stratejilerinizde kullanır mısınız? Tartışınız. 
+
+
+```{r}
+# Genişletilmiş lojistik regresyon modeli oluşturma
+logistic_model_extended <- glm(usddirection ~ usdretlag1 + usdretlag2 + usdretlag3 + usdretlag4 + usdretlag5 +
+                                 bistretlag1 + bistretlag2 + bistretlag3 + bistretlag4 + bistretlag5, 
+                               data = fin_train, 
+                               family = binomial)
+
+summary(logistic_model_extended)
+# Test verileri üzerinde tahmin yapma
+test_pred_prob_extended <- predict(logistic_model_extended, newdata = fin_test, type = "response")
+test_pred_extended <- ifelse(test_pred_prob_extended > 0.5, "Up", "Down")
+
+# Karışıklık matrisini hesaplama
+confusion_matrix_extended <- confusionMatrix(factor(test_pred_extended, levels = c("Down", "Up")), fin_test$usddirection)
+
+# Doğruluk oranı (accuracy) ve hata oranını (error rate) hesaplama
+accuracy_extended <- confusion_matrix_extended$overall['Accuracy']
+error_rate_extended <- 1 - as.numeric(accuracy_extended)
+print(paste("Doğruluk:", as.numeric(accuracy_extended)))
+print(paste("Hata Oranı:", error_rate_extended))
+
+# Karışıklık matrisini yazdırma
+print(confusion_matrix_extended)
+
+# No Information Rate (NIR) hesaplama
+nir_extended <- max(table(fin_test$usddirection)) / nrow(fin_test)
+print(paste("No Information Rate (NIR):", nir_extended))
+
+
+
+```
+
+#Yorum
+Genişletilmiş modelin doğruluk oranı (%61.1), NIR'den (%52.82) anlamlı derecede yüksektir. Bu modelin daha başarılı olduğunu söyleyebiliriz.
+
+Model, döviz kuru yönünü tahmin etmede makul bir başarıya sahiptir ve belirli bir yatırım stratejisi için kullanılabilir.
+Ancak yine de geliştirilmelidir. 
+
+
+--------------------------------------------------------
+
+# Soru 5
+
+`yasamveri2015.RData` dosyasında `veriler` isimli bir veri çerçevesi içinde Türkiye'de il düzeyinde mutluluk endeksi ile bazı il özelliklerine ilişkin değişkenler yer almaktadır. 
+
+```{r}
+load("yasamveri2015.RData")
+str(veriler)
+```
+
+## (a)
+
+İllerin mutluluk düzeyinin histogramını çiziniz ve özet istatistikleri ile birlikte yorumlayınız. İlleri mutluluk düzeyine göre büyükten küçüğe doğru sıralayan bir grafik çiziniz. En mutlu ve en mutsuz iller hangileridir? 
+
+
+```{r}
+# Mutluluk düzeyinin histogramını çizme
+veriler %>%
+  ggplot(aes(x = mutluluk)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(title = "İllerin Mutluluk Düzeyi Dağılımı", x = "Mutluluk Düzeyi", y = "Frekans") +
+  theme_minimal()
+
+summary(veriler$mutluluk)
+```
+
+#Yorum
+Histogramdan, çoğu ilin mutluluk düzeyinin orta aralıkta (55-65) yoğunlaştığını görüyoruz.
+
+```{r}
+
+# İlleri mutluluk düzeyine göre sıralama
+veriler_sorted <- veriler %>%
+  arrange(desc(mutluluk))
+
+# Mutluluk düzeyine göre sıralanmış grafik çizme
+veriler_sorted %>%
+  ggplot(aes(x = reorder(il, mutluluk), y = mutluluk)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  coord_flip() +
+  labs(title = "İllerin Mutluluk Düzeyine Göre Sıralanması", x = "İller", y = "Mutluluk Düzeyi") +
+  theme_minimal()
+
+# En mutlu ve en mutsuz iller
+en_mutlu_il <- veriler_sorted[1, "il"]
+en_mutlu_mutluluk <- veriler_sorted[1, "mutluluk"]
+
+en_mutsuz_il <- veriler_sorted[nrow(veriler_sorted), "il"]
+en_mutsuz_mutluluk <- veriler_sorted[nrow(veriler_sorted), "mutluluk"]
+
+print(paste("En mutlu il:", en_mutlu_il, "Mutluluk düzeyi:", en_mutlu_mutluluk))
+print(paste("En mutsuz il:", en_mutsuz_il, "Mutluluk düzeyi:", en_mutsuz_mutluluk))
+
+```
+
+
+
+## (b)
+
+Hedef değişken `mutluluk` için bir LASSO regresyon modeli tahmin ediniz. Ayarlanma parametresi lambda'ya 5-katlı çapraz geçerleme ile belirleyiniz. Hangi değişkenler seçildi? 
+
+
+```{r}
+library(glmnet)
+
+# Hedef değişken (mutluluk)
+y <- veriler$mutluluk
+
+# Bağımsız değişkenler
+X <- veriler %>%
+  select(-mutluluk, -il) %>% # `mutluluk` ve `il` değişkenlerini çıkarıyoruz
+  as.matrix()
+
+# LASSO modeli ve 5-katlı çapraz doğrulama
+set.seed(123)
+cv_lasso <- cv.glmnet(X, y, alpha = 1, nfolds = 5)
+
+# Çapraz doğrulama sonuçlarını görselleştirme
+plot(cv_lasso)
+
+# En iyi lambda değerini bulma (one standard error rule)
+best_lambda <- cv_lasso$lambda.1se
+print("LASSO CV en iyi lambda değeri (one standard error):")
+print(best_lambda)
+
+# En iyi lambda değeriyle LASSO modelini eğitme
+lasso_model <- glmnet(X, y, alpha = 1)
+
+# Seçilen değişkenlerin isimlerini belirleme
+lasso_coefficients <- predict(lasso_model, type = "coefficients", s = best_lambda)
+lasso_coefficients <- as.matrix(lasso_coefficients) # Matris olarak dönüştür
+selected_features <- lasso_coefficients[-1, ] #(intercept)
+selected_feature_names <- rownames(lasso_coefficients)[which(selected_features != 0)]
+
+# Seçilen değişkenleri yazdırma
+print("Seçilen değişkenler:")
+print(selected_feature_names)
+
+```
+
+
+
+------------------------------------------------------------------
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
